@@ -67,6 +67,7 @@ button small{display:block;font-weight:400;font-size:12px;opacity:.9}.q button.o
 body.bu .buy{background:var(--up)}body.bu .sell{background:var(--dn)}.pri{background:var(--dn);flex:1;min-width:120px}
 .amt{display:flex;gap:8px;margin:8px 0}.amt button{flex:1;background:var(--soft);color:var(--tx);padding:12px 8px}.amt button.on{background:var(--tx);color:var(--bg)}
 button[disabled]{opacity:.35;cursor:not-allowed}.ct{width:100%;font-size:13px}.ct th{color:var(--mut);font-weight:400;text-align:right;padding:4px 0}.ct td{text-align:right;padding:7px 0;border-top:1px solid var(--line)}.ct td:first-child,.ct th:first-child{text-align:left;font-weight:600}.ct tr.tot td{font-weight:600;font-size:14px}.sec .ct{font-size:12px}
+.req{display:block;background:var(--soft);border:2px solid var(--gold);border-radius:14px;padding:12px 14px;margin:14px 0 10px}.req b{display:block;color:var(--gold);font-size:17px;line-height:1.3}.req span{display:block;margin-top:5px;font-size:14px}
 </style></head><body>
 <div class="app">
 <header class="top">
@@ -87,6 +88,7 @@ button[disabled]{opacity:.35;cursor:not-allowed}.ct{width:100%;font-size:13px}.c
 <section class="led"><small>Running P&amp;L (this scenario)</small><div class="ta" id="rpl"></div>
 <dl><div><dt>Squared at news events</dt><dd id="sqd"></dd></div><div><dt>Completed scenarios</dt><dd id="pv0"></dd></div><div><dt>Total P&amp;L</dt><dd id="tpl"></dd></div></dl></section>
 <section class="sec"><h3>Trade calculation</h3><div id="ctb"></div></section>
+<section class="sec" id="sqs" style="display:none"><h3 id="sqh">Squared</h3><div id="sqt"></div></section>
 <section class="sec"><h3>Transactions</h3><div id="hist">Transaction history appears here.</div></section>
 </aside>
 </div>
@@ -122,7 +124,7 @@ const SCN=[
  l:{b:["Buy","Bet the dollar rises"],s:["Sell","Bet the dollar falls"]},
  ot:{Buy:"Bet the dollar rises (buy USDJPY)",Sell:"Bet the dollar falls (sell USDJPY)"},sn:"Selling more than you hold opens a short position, which gains if USDJPY falls, meaning the yen gets stronger.",
  intro:"USDJPY is the price of one US dollar in Japanese yen. When the number rises, the dollar is getting stronger against the yen; when it falls, the yen is getting stronger.</p><p>The scenario covers daily price movements over a period of nearly 2 years. Watch the chart. When major news breaks, the game pauses. At each event, choose an amount, then <b>Buy</b> if you think the dollar will rise against the yen, <b>Sell</b> if you think it will fall, or hold. Trades are only allowed at news events.",
- why:["A rate hike usually supports the yen, but this one was widely expected, so the surprise was small.","Worries about tariffs hurt confidence in the dollar, and money moved toward other currencies such as the yen.","Higher Japanese interest rates make the yen more attractive, and officials warned against speculation.","When a government buys its own currency to stop it falling, the currency can jump quickly.","Both central banks raised rates, so the gap between US and Japanese interest rates barely changed."]}];
+ why:["A rate hike usually supports the yen, but this one was widely expected, so the surprise was small.","Worries about tariffs hurt confidence in the dollar, and money moved toward other currencies such as the yen.","Normally, a central bank raising rates strengthens its own currency, which here would be the yen. The dollar strengthened this time as the rate increase was outweighed by dovish forward guidance. US interest rates are still more attractive than Japanese yen rates.","When a government buys its own currency to stop it falling, the currency can jump quickly.","Both central banks raised rates, so the gap between US and Japanese interest rates barely changed."]}];
 [SCN[0],SCN[1]]=[SCN[1],SCN[0]];
 function load(i){CF=SCN[i];K=CF.K;N=K.length;OFF=CF.OFF;SC=CF.SC;CP=CF.CP||[];SPD=CF.spd;document.body.classList.toggle("bu",!!CF.buyUp);
 TH={}}
@@ -141,7 +143,7 @@ let TH={};const V=n=>TH[n]??=getComputedStyle(document.documentElement).getPrope
 const $=i=>document.getElementById(i),usd=v=>(v<0?"-":"")+"$"+Math.abs(Math.round(v)).toLocaleString("en-US");
 const sg=v=>(v>0?"+":"")+usd(v);
 let S,tm=null,pend=null,seen={};
-function fresh(name,dept){dept=dept||"";S={name,dept,key:keyOf(name,dept),res:[],np:0,sc:0,prev:0,d:1,trades:[],hist:[],marks:[],pred:{},ok:0,snap:{},rc:{},curve:[],sqPL:0,sq:[],nt:0};seen={}}
+function fresh(name,dept){dept=dept||"";S={name,dept,key:keyOf(name,dept),res:[],np:0,sc:0,prev:0,d:1,trades:[],hist:[],marks:[],pred:{},ok:0,snap:{},rc:{},curve:[],sqPL:0,sq:[],nt:0,lastSq:null};seen={}}
 const cy=()=>K[S.d-1].c;
 function pnl(cur){cur=cur==null?price(cy()):cur;const fx=CF.id=="fx",rl=!!CF.real;let Nb=0,Gb=0,Ns=0,Gs=0,Ub=0,Us=0;
 for(const t of S.trades){if(!rl){const g=t.nom*t.p/100;if(t.nom>0){Nb+=t.nom;Gb+=g}else{Ns+=t.nom;Gs+=g}}
@@ -161,14 +163,14 @@ function trade(nom){const v=cy(),p=price(v);S.trades.push({nom,p,v});S.nt++;
 S.hist.unshift(`[${CF.short}] ${fd(S.d-1)}: ${nom>0?"BUY":"SELL"} ${usd(Math.abs(nom))} at ${CF.th(p,v)}`);S.marks.push({i:S.d-1,s:nom>0?"Buy":"Sell"});beep(nom>0?520:420,.1)}
 function square(s){if(!S.trades.length)return"";const t=pnl();S.sqPL+=t.pl;S.sq.push({at:s?"News "+s.n:"End",t});
 S.hist.unshift(`[${CF.short}] ${fd(S.d-1)}: SQUARED ${usd(Math.abs(t.net))} at ${CF.th(t.cur,cy())}, P&L ${sg(t.pl)}`);S.trades=[];
-return s?`<div class="since"><b>Previous position squared at this news event</b>${tbl(t,"P&amp;L for this period")}<p style="margin:6px 0 0">Scenario P&amp;L so far: <b class="${S.sqPL>=0?"gain":"loss"}">${sg(S.sqPL)}</b></p></div>`:""}
+S.lastSq={at:s?"News "+s.n:"End of scenario",t};return s?`<div class="since" style="padding:9px 12px"><b>Previous position squared:</b> <b class="${t.pl>=0?"gain":"loss"}">${sg(t.pl)}</b> &middot; Scenario P&amp;L so far <b class="${S.sqPL>=0?"gain":"loss"}">${sg(S.sqPL)}</b><br><span style="color:var(--mut);font-size:13px">Full calculation: see the Squared table under Trade calculation.</span></div>`:""}
 const sqTable=a=>a.length?`<table class="ct"><tr><th>Squared at</th><th>Trade</th><th>Entry</th><th>Exit</th><th>P&amp;L</th></tr>${a.map(x=>{const t=x.t,b=t.Nb&&!t.Ns;return `<tr><td>${x.at}</td><td>${t.Nb&&t.Ns?"Mixed":b?"Buy "+usd(t.Nb):"Sell "+usd(-t.Ns)}</td><td>${(b?t.wb:t.ws).toFixed(CF.real?2:3)}</td><td>${t.cur.toFixed(CF.real?2:3)}</td><td class="${t.pl>=0?"gain":"loss"}">${sg(t.pl)}</td></tr>`}).join("")}</table>`:"<p>No trades were made in this scenario.</p>";
 function extras(){const k=K[S.d-1],t=pnl(),m=CF.mag(k.o,k.c),bd=CF.id=="bond";$("pg").style.width=S.d/N*100+"%";
 $("dots").innerHTML=SC.map(e=>`<i class="${S.d>e.d?"on":""}" style="left:${e.d/N*100}%"></i>`).join("");
 const d=$("dl");d.textContent=(m>=0?"+":"")+m.toFixed(CF.md)+CF.mu+" today";d.className=m>=0?"up":"dn";S.curve[S.d-1]=S.sqPL+t.pl;
 $("hl").textContent=CF.hl;$("sub").textContent=CF.sub+" \u00b7 Scenario "+(S.sc+1)+" of "+SCN.length;$("r0").textContent=fd(0,{month:"short",year:"numeric"});$("r1").textContent=fd(N-1,{month:"short",year:"numeric"});
 $("l1").textContent=bd?"Price":"Day open";$("l5").textContent=bd?"US CPI":"Change so far";$("note").textContent=CF.note;
-const r=$("rpl");const run=S.sqPL+t.pl;r.textContent=sg(run);r.className="ta "+(run>=0?"gain":"loss");$("sqd").textContent=sg(S.sqPL);$("pv0").textContent=sg(S.prev);$("tpl").textContent=sg(S.prev+run);$("ctb").innerHTML=tbl(t,"Open position P&amp;L")}
+const r=$("rpl");const run=S.sqPL+t.pl;r.textContent=sg(run);r.className="ta "+(run>=0?"gain":"loss");$("sqd").textContent=sg(S.sqPL);$("pv0").textContent=sg(S.prev);$("tpl").textContent=sg(S.prev+run);$("ctb").innerHTML=tbl(t,"Open position P&amp;L");const q=S.lastSq;$("sqs").style.display=q?"":"none";if(q){$("sqh").textContent="Squared at "+(q.at=="End of scenario"?"the end of the scenario":q.at.replace("News ","news event "));$("sqt").innerHTML=tbl(q.t,"P&amp;L for this period")+`<p style="margin:8px 0 0;font-size:13px">Scenario P&amp;L so far: <b class="${S.sqPL>=0?"gain":"loss"}">${sg(S.sqPL)}</b></p>`}}
 function render(){extras();const k=K[S.d-1],bd=CF.id=="bond",cp=bd&&cpAt(S.d-1),ch=pct(K[0].o,k.c);
 $("day").textContent=fd(S.d-1);$("cpi").textContent=bd?cp[1].toFixed(1)+"% ("+cp[2]+")":(ch>=0?"+":"")+ch.toFixed(1)+"%";$("who").textContent=S.name+(S.dept?" \u00b7 "+S.dept:"");
 $("y").textContent=CF.f(k.c);$("p").textContent=bd?price(k.c).toFixed(3):CF.f2(k.o);
@@ -218,7 +220,7 @@ return `<div class="tag">Leaderboard</div><h2>Top traders</h2><ol class="lb">${a
 <p class="note">Preview: scores are saved on this device only, and sample rows are placeholders.</p>${label?`<div class="row"><button class="pri" onclick="start()">${label}</button></div>`:""}`}
 const board=l=>show(boardHTML(l));
 function ranking(){board("Next player");if(KIOSK){clearTimeout(window.kt);window.kt=setTimeout(()=>{if(/Top traders/.test($("card").textContent))start()},45000)}}
-function resetScn(){load(S.sc);Object.assign(S,{d:1,trades:[],marks:[],pred:{},rc:{},snap:{},curve:[],sqPL:0,sq:[],nt:0});seen={};render()}
+function resetScn(){load(S.sc);Object.assign(S,{d:1,trades:[],marks:[],pred:{},rc:{},snap:{},curve:[],sqPL:0,sq:[],nt:0,lastSq:null});seen={};render()}
 function intro(){resetScn();show(`<div class="tag">Scenario ${S.sc+1} of ${SCN.length}</div><h2>${CF.name}</h2><p>${CF.intro}</p>${S.sc?`<p class="note" style="margin:0">Total P&amp;L so far: <b class="${S.prev>=0?"gain":"loss"}">${sg(S.prev)}</b></p>`:""}<div class="row"><button class="pri" onclick="hide();play()">Begin scenario</button></div>`)}
 function endScn(){pause();hide();$("toast").classList.remove("on");SC.forEach(e=>settle(e,5));square(null);S.res.push({name:CF.name,trades:S.nt,pl:S.sqPL,sq:S.sq});S.prev+=S.sqPL;scnDone()}
 function nextScn(){S.sc++;S.sc<SCN.length?intro():results()}
@@ -237,10 +239,8 @@ show(`<div class="tag">Trading Finished</div><h2>${esc(S.name)}'s investment res
 function start(){show(`<h2>Welcome!</h2><p>Test your market instincts across three asset classes - bond, equity and currency - and see how much profit you can generate.</p>
 <h3>Rules</h3><ol class="rules"><li>Each scenario replays daily price movements and pauses at every major news event.</li><li>Trades are only allowed at news events: choose an amount (USD 1, 3 or 10 million), then Buy or Sell, or do nothing. Short selling is permitted.</li><li>Your position is squared (closed) at the next news event and at the end of each scenario. The player with the highest total profit and loss (P&amp;L) wins the prize.</li></ol>
 <p style="margin:10px 0 0"><b>Good luck!</b> Markets are unpredictable - stay sharp and make every decision count.</p>
-<p class="note" style="margin:12px 0 6px">Please enter your full name and department below. (Only one entry is allowed - if two entries are submitted, only the first will be counted)</p>
+<div class="req"><b>Full name and department are required to be eligible for the prize.</b><span>This is how we identify participants and contact winners. Only one entry is allowed - if two are submitted, only the first counts. Winners will be notified directly and may collect their prizes on the next working day.</span></div>
 <input id="nm" placeholder="Full name" style="width:100%" maxlength="40"><input id="dp" placeholder="Department" style="width:100%" maxlength="30"><div id="m"></div>
-<p style="font-size:13px;margin:12px 0 4px;color:var(--mut)">To be eligible for the prize, participants are required to provide their full name and department when submitting their entry. This is to facilitate participation identification and ensure smooth communication with the winners.</p>
-<p style="font-size:13px;margin:0;color:var(--mut)">Winners will be notified directly and may collect their prizes on the next working day.</p>
 <div class="row"><button class="ghost" onclick="board('Back')">Leaderboard</button><button class="pri" onclick="launch()">Start</button></div>`)}
 function launch(){const n=$("nm").value.trim(),d=$("dp").value.trim();if(!n||!d){$("m").innerHTML='<div class="err">Please enter your name and department.</div>';return}
 if(rows().some(r=>r.key==keyOf(n,d))){$("m").innerHTML='<div class="err">This name and department already has an entry. Only the first entry is counted.</div>';return}
